@@ -1,0 +1,101 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Aula 10 · Laura</title><style>body{font:15px/1.5 "Segoe UI",system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 16px;color:#111}h2{border-bottom:2px solid #ddd;padding-bottom:.25rem;margin-top:1.6rem}dt{font-weight:700;margin-top:.6rem}dd{margin:.2rem 0 0;white-space:pre-wrap}dd.vazio{color:#b42318;font-style:italic}img{max-width:100%;border:1px solid #ccc;border-radius:6px}pre{background:#f4f4f4;padding:.6rem;border-radius:6px;white-space:pre-wrap;font:12.5px/1.45 Consolas,monospace}</style><h1>Laboratório de Concorrência · Aula 10</h1><p>Laura · RA 24008833-2 · Turma B<br>Gerado em 17/10/2026, 15:36:53 · tempo registrado no cronômetro: 90:06</p><h2>Preparação: Concorrência em cinco minutos</h2><dl><dt>0.1 Com suas palavras: qual é a diferença entre sincronização de cooperação e de competição? Dê um exemplo do dia a dia (fora da computação) para cada uma.</dt><dd>Cooperação envolve uma espera entre as tarefas, como um garçom que aguarda o chef terminar o prato para que possa pegar esse prato, enquanto a competição, como o nome diz, implica que duas tarefas querem a mesma coisa, podendo causar conflitos, como dois garçons indo pegar o mesmo prato da cozinha.</dd></dl><h2>Prática 1: A condição de corrida</h2><dl><dt>Previsão: Duas threads somam 1.000.000 cada. Que valor você espera que o programa imprima?</dt><dd>Em tese, 2.000.000</dd><dt>1ª execução (n = 1.000.000)</dt><dd>esperado: 2000000 obtido:   1970059</dd><dt>2ª execução (n = 1.000.000)</dt><dd>esperado: 2000000 obtido:   1018739</dd><dt>3ª execução (n = 1.000.000)</dt><dd>esperado: 2000000 obtido:   1333511</dd><dt>Saída do programa</dt><dd><pre>Primeira:
+esperado: 2000
+obtido:   2000
+
+Segunda:
+esperado: 2000
+obtido:   2000</pre></dd><dt>1.1 Os valores bateram com o esperado? Foram iguais nas três execuções? Por que mudam de uma execução para outra?</dt><dd>Nenhum deles foi igual ao esperado, sendo os valores de cada execução diferentes uns dos outros. Acho que provavelmente essa mudança de valores se dá por conta de falta de sincronização.</dd><dt>1.2 Explique, passo a passo, como uma atualização se perde. Use os três passos (ler, somar, gravar) e as duas threads.</dt><dd>Tendo as threads t1 e t2 e a variável contador:
+t1: Acessa o valor de contador (que no momento é 0) e soma mais 1
+t2: Acessa o valor de contador (que, como a t1 ainda não gravou a sua soma, é 0), soma mais 1 e grava (contador == 1)
+t1: Grava o valor da sua soma (1) na variável contador, sobrescrevendo o mesmo 1 que foi gravado pela t2
+
+Logo, com 2 somas, o resultado foi 1, perdendo uma atualização.</dd><dt>1.3 Com n = 1000, o que aconteceu? Por que isso torna esse tipo de erro perigoso em sistemas reais? Pense em como o programa se comportaria nos testes e em produção.</dt><dd>O programa conseguiu calcular os 2000 esperados. Isso é perigoso pois, se em uma situação real fora testado apenas números menores, como o 1000, os testes seriam aceitos e o perigo de casos como o de 1.000.000 passariam despercebidos, podendo estourar em produção.</dd></dl><h2>Prática 2: Todas as respostas possíveis (Figura 13.1)</h2><dl><dt>Ordens testadas no simulador</dt><dd>AAABBB → 8
+BBBAAA → 7
+AABBAB → 6
+BBAABA → 4</dd><dt>Saída do programa</dt><dd><pre>AAABBB -&gt; 8
+BBBAAA -&gt; 7
+ABABAB -&gt; 6
+Ordens possíveis: 20
+TOTAL = 4:  9 ordens, por exemplo AABBBA
+TOTAL = 6:  9 ordens, por exemplo AABABB
+TOTAL = 7:  1 ordens, por exemplo BBBAAA
+TOTAL = 8:  1 ordens, por exemplo AAABBB</pre></dd><dt>2.1 Quantas ordens são possíveis e quantos resultados diferentes aparecem? Quantas ordens dão o resultado "correto" (8)?</dt><dd>De acordo com a saída, são possíveis 20 ordens, com 4 resultados possíveis. O resultado correto vem de apenas 1 ordem (AAABBB)</dd><dt>2.2 Escolha uma ordem que dá 4 e explique passo a passo por que o resultado é 4. O que aconteceu com a operação de B?</dt><dd>BBAABA = 4
+B leu o número 3
+B realizou a operação e resultou em 6
+A leu o número 3
+A realizou a operação e resultou em 4
+B gravou o seu resultado, 6
+A sobrescreveu com o seu resultado, 4.
+
+O resultado da operação de B foi sobrescrita.</dd></dl><h2>Prática 3: Corrigindo a corrida</h2><dl><dt>Previsão: As três versões fazem a mesma conta. Qual você acha que será a mais rápida? E alguma será incorreta?</dt><dd>Acho que a operação atômica é mais rápida, por realizar todas as operações em um passo só. Talvez a do semáforo, por usar um contador,  pode dar problema.</dd><dt>Saída do programa</dt><dd><pre>esperado:          2000000
+sem sincronizacao: 1440189 em 2 ms
+synchronized:      2000000 em 173 ms
+AtomicInteger:     2000000 em 74 ms
+
+esperado:          2000000
+sem sincronizacao: 1541732 em 2 ms
+synchronized:      2000000 em 93 ms
+AtomicInteger:     2000000 em 27 ms</pre></dd><dt>3.1 Quais versões deram o valor correto? Compare os tempos: por que a versão correta costuma ser mais lenta que a versão sem sincronização?</dt><dd>Em ambas as execuções, o synchronized e o AtomicInteger deram o valor correto. São mais lentos justamente por conta da sincronização, podendo envolver esperas.</dd><dt>3.2 Uma transferência bancária tira dinheiro de uma conta e coloca em outra. Um AtomicInteger em cada saldo resolve? Por quê? O que seria preciso?</dt><dd>Usando a ferramenta ChatGPT, foi visto que não resolve, pois o AtomicInteger protege apenas um "método", e uma transferência bancária envolve 2, tirar de uma conta e adicionar em outra. A alternativa dada pela ferramenta foi de usar um lock, bloqueando as contas durante a transação.</dd></dl><h2>Prática 4: Impasse (deadlock)</h2><dl><dt>Previsão: Leia o código: A pega X e depois Y; B pega Y e depois X. As mensagens "A terminou" e "B terminou" vão aparecer?</dt><dd>Acho que não, pois ambos estarão parados.</dd><dt>Saídas (antes e depois da correção)</dt><dd><pre>Antes:
+IMPASSE: 2 threads presas
+
+Depois:
+A terminou
+B terminou
+sem impasse</pre></dd><dt>4.1 Por que as duas threads ficaram presas? Descreva o que cada uma tinha e o que cada uma esperava.</dt><dd>Elas ficaram presas pois cada uma esperava um recurso que estava com a outra: A tinha X e esperava Y, porém o Y estava com o B, que esperava o X, no qual estava com o Y.</dd><dt>4.2 Por que pegar os recursos sempre na mesma ordem elimina o impasse? Dê um exemplo de sistema real em que isso poderia acontecer.</dt><dd>Pois eles não esperarão recursos associados a outros processos. Um exemplo, dado pelo ChatGPT, é de atualização de estoque, onde uma thread tenta atualizar o estoque de teclados e depois de notebooks, enquanto outra thread tenta atualizar o estoque de notebooks e depois de teclados.</dd></dl><h2>Prática 5: Mensagens em vez de memória compartilhada</h2><dl><dt>Previsão: São 6 tarefas de 100 ms divididas entre 3 trabalhadores. Quanto tempo você espera que leve no total? E com 1 trabalhador? E com 6?</dt><dd>Em tese:
+3 trabalhadores: 300 ms
+1 trabalhador: 600 ms
+6 trabalhadores: 100 ms</dd><dt>Tempo com 1 trabalhador</dt><dd>600ms</dd><dt>Tempo com 3 trabalhadores</dt><dd>200ms</dd><dt>Tempo com 6 trabalhadores</dt><dd>100ms</dd><dt>Saída do programa</dt><dd><pre>trabalhador 1 fez a tarefa 1
+trabalhador 1 fez a tarefa 2
+trabalhador 1 fez a tarefa 3
+trabalhador 1 fez a tarefa 4
+trabalhador 1 fez a tarefa 5
+trabalhador 1 fez a tarefa 6
+1 trabalhadores, 6 tarefas de 100 ms: levou 600ms
+
+trabalhador 3 fez a tarefa 1
+trabalhador 2 fez a tarefa 3
+trabalhador 1 fez a tarefa 2
+trabalhador 1 fez a tarefa 6
+trabalhador 3 fez a tarefa 4
+trabalhador 2 fez a tarefa 5
+3 trabalhadores, 6 tarefas de 100 ms: levou 200ms
+
+trabalhador 2 fez a tarefa 3
+trabalhador 6 fez a tarefa 1
+trabalhador 1 fez a tarefa 2
+trabalhador 3 fez a tarefa 4
+trabalhador 4 fez a tarefa 5
+trabalhador 5 fez a tarefa 6
+6 trabalhadores, 6 tarefas de 100 ms: levou 100ms</pre></dd><dt>5.1 Explique os três tempos. Por que este programa não precisa de synchronized nem de trava?</dt><dd>Os três tempos fazem sentido, tempo as tarefas sendo divididas igualmente entre a quantidade de trabalhadores. De acordo com o ChatGPT: o canal faz a comunicação e a distribuição das tarefas, as goroutines permitem a execução concorrente e o WaitGroup garante que o programa principal espere todos os trabalhadores terminarem.</dd><dt>Saídas (antes e depois da troca)</dt><dd><pre>Antes:
+fatal error: all goroutines are asleep - deadlock!
+
+goroutine 1 [chan send]:
+main.main()
+	/box/main.go:9 +0x38
+exit status 2
+
+Depois:
+1</pre></dd><dt>5.2 Por que o primeiro programa trava? Por que o canal com espaço para 1 mensagem resolve? (Dica: num canal sem espaço, quem envia espera alguém receber.)</dt><dd>O primeiro programa para pois todas as rotinas estão paradas, resultando em deadlock. Com ajuda do Chat, resolve pois há um espaço para armazenar o valor, sem precisar esperar alguém para receber, pois: "o valor 1 é armazenado no buffer, sem precisar de um receptor imediato."</dd></dl><h2>Prática 6: O compilador como guarda</h2><dl><dt>Previsão: Este programa faz uma thread somar 1 a uma variável de main. O que você acha que acontece?</dt><dd>Acho que contador vai ficar valendo 1.</dd><dt>Saídas (o erro e o resultado com move)</dt><dd><pre>note: requirement that the value outlives `'static` introduced here
+  --&gt; /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:128:14
+
+error: aborting due to 2 previous errors
+
+Some errors have detailed explanations: E0373, E0502.
+For more information about an error, try `rustc --explain E0373`.
+
+Depois:
+warning: value assigned to `contador` is never read
+ --&gt; HelloWorld.rs:8:9
+  |
+8 |         contador += 1;                       // a thread altera a variável de main
+  |         ^^^^^^^^^^^^^
+  |
+  = help: maybe it is overwritten before being read?
+
+warning: 2 warnings emitted
+
+0</pre></dd><dt>Saída do programa</dt><dd><pre>contador = 400000</pre></dd><dt>6.1 Com move, o programa compila mas imprime 0. Por quê? (Dica: move faz a thread levar uma cópia do número.)</dt><dd>Com ajuda do ChatGPT, o programa imprime 0 pois a thread modifica apenas uma cópia do contador, e não a variável propriamente dita.</dd><dt>6.2 Compare com a Prática 1: em que momento o erro foi descoberto em Java e em Rust? Qual é a vantagem e qual é o custo para quem programa?</dt><dd>Em Java, na prática 1, esse erro é descoberto apenas testando, podendo aparecer apenas em produção. Não sei qual seria a vantagem para um potencial erro escondido, sendo um custo para o programador ao estourar em produção e precisar ser refatorado. Agora em Rust, o erro aparece já na compilação, impedindo o seguimento com esse erro.</dd></dl><h2>Prática 7: Uma thread só: o laço de eventos</h2><dl><dt>Previsão: Em que ordem você acha que as letras A, B, C e D serão impressas?</dt><dd>A B C D</dd><dt>Saída do programa</dt><dd><pre>A
+D
+C
+B
+E: timer de 10 ms rodou depois de 300 ms</pre></dd><dt>7.1 Em que ordem as letras saíram? Por que B, com tempo 0, saiu depois de D e de C?</dt><dd>A D C B. De acordo com o Chat, é por que a ordem de execução é a seguinte: Código principal (A e D), microtasks (C) e depois os timeouts (B).</dd><dt>7.2 O timer de 10 ms (linha E) rodou bem depois de 10 ms. Por quê? O que isso significa para um servidor Node.js que atende muitos usuários e faz um cálculo pesado?</dt><dd>Pois, por conta da ordem de execução, o código principal da função é feito antes do timeout, e ele fica 300ms preso no código principal, fazendo o timeout depois disso.</dd></dl><h2>Fechamento: Quem impede a corrida?</h2><dl><dt>Java sem sincronização</dt><dd>Ninguém: há corrida</dd><dt>Java com synchronized</dt><dd>O programador, com sincronização</dd><dt>Go com canais</dt><dd>O projeto: não há memória compartilhada</dd><dt>Rust com Arc e Mutex</dt><dd>O compilador</dd><dt>JavaScript</dt><dd>Só existe uma thread</dd><dt>8.1 Um site de venda de ingressos tem 1 lugar restante, e duas pessoas clicam em Comprar ao mesmo tempo. Qual problema desta atividade pode acontecer? Como você o evitaria?</dt><dd>Condição de corrida. Pensei em analisar o tempo em menores ordens de tempo (ms para menos), porém o chat deu a ideia de a verificação do estoque do ingresso e a reserva serem feitas em uma mesma operação atômica.</dd><dt>8.2 Em uma frase: o que mais surpreendeu você nesta atividade?</dt><dd>Os diferentes jeitos de lidar com as condições de corrida/deadlock nas linguagens.</dd></dl></html>
